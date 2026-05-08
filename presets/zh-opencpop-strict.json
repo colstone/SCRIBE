@@ -1,0 +1,13 @@
+{
+  "name": "opencpop-strict",
+  "language": "普通话",
+  "vowels": [
+    "a", "ai", "an", "ang", "ao",
+    "e", "ei", "en", "eng", "er",
+    "i", "in", "ing",
+    "o", "ong", "ou",
+    "u", "un",
+    "v"
+  ],
+  "builtin": true
+}

@@ -1,0 +1,13 @@
+{
+  "name": "opencpop-extension",
+  "language": "普通话",
+  "vowels": [
+    "a", "ai", "an", "ang", "ao",
+    "e", "ei", "en", "eng", "er",
+    "i", "ia", "ian", "iang", "iao", "ie", "in", "ing", "iong", "iu",
+    "o", "ong", "ou",
+    "u", "ua", "uai", "uan", "uang", "ui", "un", "uo",
+    "v", "van", "ve", "vn"
+  ],
+  "builtin": true
+}

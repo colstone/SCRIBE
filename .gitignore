@@ -1,0 +1,34 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+
+# Rust / Tauri build
+src-tauri/target/
+
+# ASIO SDK (cannot be redistributed)
+asio_sdk/
+ASIO-SDK_*.zip
+
+# LLVM installer
+LLVM-*.exe
+
+# Python bytecode
+__pycache__/
+*.pyc
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Environment
+.env
+.env.local
+
+# Model weights (download separately)
+*.scr
+
+# IDE / editor
+.vscode/
+.idea/
