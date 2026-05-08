@@ -202,6 +202,7 @@ const PhNumGenerationDialog: React.FC<PhNumGenerationDialogProps> = ({
         unique.push(ph);
       }
     }
+    unique.sort((a, b) => a.localeCompare(b));
     return unique;
   }, [phSeq]);
 

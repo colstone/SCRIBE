@@ -37,8 +37,6 @@ export interface Segment {
   status: SegmentStatus;
   audioDuration: number;
   data: SegmentData;
-  undoStack: EditAction[];
-  redoStack: EditAction[];
 }
 
 export interface SegmentData {
@@ -75,33 +73,6 @@ export interface WordGroup {
   noteCount: number;
 }
 
-// --- Edit Actions (Undo/Redo) ---
-
-export interface EditAction {
-  type:
-    | 'pitch_change'
-    | 'split_note'
-    | 'merge_notes'
-    | 'set_rest'
-    | 'delete_note'
-    | 'insert_note'
-    | 'modify_ph_num'
-    | 'snap_cents'
-    | 'batch_pitch_change';
-  timestamp: number;
-  forward: () => void;
-  backward: () => void;
-}
-
-// --- Editor State Types ---
-
 export type EditorMode = 'select' | 'split' | 'merge';
 export type InteractionState = 'idle' | 'dragging' | 'boxSelecting' | 'panning';
 
-// --- Validation ---
-
-export interface ValidationError {
-  code: string;
-  message: string;
-  noteId?: string;
-}

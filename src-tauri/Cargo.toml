@@ -40,4 +40,3 @@ opt-level = 2
 [profile.dev.package."*"]
 opt-level = 2
 
-

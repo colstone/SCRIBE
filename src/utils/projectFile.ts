@@ -188,8 +188,6 @@ function deserializeProject(data: SerializedProject): Project {
         f0Modified: seg.data.f0Modified,
         noteGlide: seg.data.noteGlide,
       },
-      undoStack: [],
-      redoStack: [],
     } satisfies Segment)),
     createdAt: data.createdAt,
     updatedAt: data.updatedAt,

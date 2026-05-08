@@ -20,7 +20,6 @@ export interface AppSettings {
   language: 'zh' | 'en';
   audioDeviceId: string;
   audioBufferSize: number;
-  audioExclusive: boolean;
   midiEstimator: 'simple' | 'some';
   navigationMode: 'mouse' | 'trackpad' | 'touch';
 }
@@ -43,7 +42,6 @@ const DEFAULTS: AppSettings = {
   language: 'zh',
   audioDeviceId: '',
   audioBufferSize: 512,
-  audioExclusive: false,
   midiEstimator: 'simple' as const,
   navigationMode: 'mouse' as const,
 };

@@ -7,6 +7,7 @@ import PhNumGenerationDialog from './components/Dialogs/PhNumGenerationDialog';
 import SettingsDialog from './components/Dialogs/SettingsDialog';
 import AboutDialog from './components/Dialogs/AboutDialog';
 import LicensesDialog from './components/Dialogs/LicensesDialog';
+import BatchPhonemeRenameDialog from './components/Dialogs/BatchPhonemeRenameDialog';
 import { useProjectStore } from './stores/projectStore';
 import { useEditorStore } from './stores/editorStore';
 import { useAudioStore } from './stores/audioStore';
@@ -18,6 +19,8 @@ import { loadProject as loadProjectFile } from './utils/projectFile';
 import { noteNameToMidi } from './utils/midiUtils';
 import { inferPhNum } from './engine/phNumInfer';
 import { deriveWordGroups } from './engine/wordGroupDeriver';
+import { estimateMidi } from './engine/midiEstimator';
+import { estimateMidiWithSome } from './engine/someEstimator';
 import { PH_NUM_PRESETS } from './data/phNumPresets';
 import { useSettingsStore, AppSettings } from './stores/settingsStore';
 import { useStatusStore } from './stores/statusStore';
@@ -46,6 +49,7 @@ export default function App() {
   const [showSettingsDialog, setShowSettingsDialog] = useState(false);
   const [showAboutDialog, setShowAboutDialog] = useState(false);
   const [showLicensesDialog, setShowLicensesDialog] = useState(false);
+  const [showBatchRenameDialog, setShowBatchRenameDialog] = useState(false);
   const [confirmDialog, setConfirmDialog] = useState<{
     title: string;
     message: string;
@@ -150,6 +154,22 @@ export default function App() {
           message: '此操作会重新提取所有 WAV 的 F0，耗时较长，确定执行？',
           onConfirm: () => extractAllF0(),
         });
+      }));
+      unlisteners.push(await listen('menu-batch-estimate', () => {
+        if (!useProjectStore.getState().project) return;
+        const settings = useSettingsStore.getState();
+        const isSome = settings.midiEstimator === 'some';
+        setConfirmDialog({
+          title: '批量自动估算音符音高',
+          message: isSome
+            ? '将对所有条目使用 SOME 模型进行音符音高估算。较长时长的切片推理速度可能较慢，整体耗时取决于条目数量和音频时长。是否继续？'
+            : '将对所有条目使用 F0 进行音符音高估算（需要先提取 F0）。是否继续？',
+          onConfirm: () => batchEstimate(),
+        });
+      }));
+      unlisteners.push(await listen('menu-batch-rename-ph', () => {
+        if (!useProjectStore.getState().project) return;
+        setShowBatchRenameDialog(true);
       }));
       unlisteners.push(await listen('menu-export', handleExportCsv));
       unlisteners.push(await listen('menu-prev-segment', () => {
@@ -397,8 +417,6 @@ export default function App() {
             status: 'todo' as const,
             audioDuration: totalDuration,
             data,
-            undoStack: [],
-            redoStack: [],
           };
         });
 
@@ -443,6 +461,25 @@ export default function App() {
     },
     [setCurrentSegment],
   );
+
+  const handleBatchRename = useCallback((renameMap: Record<string, string>) => {
+    setShowBatchRenameDialog(false);
+    const projStore = useProjectStore.getState();
+    const proj = projStore.project;
+    if (!proj) return;
+
+    const updatedSegments = proj.segments.map((seg) => {
+      const newPhSeq = seg.data.phSeq.map((ph) => renameMap[ph] ?? ph);
+      const hasChange = newPhSeq.some((ph, i) => ph !== seg.data.phSeq[i]);
+      if (!hasChange) return seg;
+      return { ...seg, data: { ...seg.data, phSeq: newPhSeq } };
+    });
+
+    projStore.loadProject({ ...proj, segments: updatedSegments, updatedAt: new Date().toISOString() });
+    const count = Object.keys(renameMap).length;
+    useStatusStore.getState().setStatus(`已修改 ${count} 个音素`, 'success');
+    setTimeout(() => useStatusStore.getState().setIdle(), 2000);
+  }, []);
 
   const handlePhNumConfirm = useCallback(
     (vowelList: string[], _presetName: string | null) => {
@@ -625,6 +662,87 @@ export default function App() {
     }
   }, []);
 
+  const batchEstimate = useCallback(async () => {
+    const projStore = useProjectStore.getState();
+    const proj = projStore.project;
+    if (!proj) return;
+
+    const settings = useSettingsStore.getState();
+    const isSome = settings.midiEstimator === 'some';
+    const total = proj.segments.length;
+    let processed = 0;
+
+    useStatusStore.getState().setStatus(`批量估算音高...（0/${total}）`, 'working');
+
+    try {
+      const { invoke } = await import('@tauri-apps/api/core');
+
+      for (let i = 0; i < total; i++) {
+        const seg = proj.segments[i];
+        useStatusStore.getState().setStatus(`批量估算音高...（${processed}/${total}）`, 'working');
+
+        if (isSome) {
+          if (!seg.wavPath) { processed++; continue; }
+          try {
+            const someResult = await invoke('extract_midi_some', { wavPath: seg.wavPath }) as {
+              frameMidi: number[]; frameBounds: number[]; frameRest: boolean[]; timestep: number;
+            };
+            const { notes: estNotes, noteCountPerWg } = estimateMidiWithSome(someResult, seg.data.wordGroups, seg.data.notes);
+
+            const newNotes: Note[] = [];
+            const newWgs = seg.data.wordGroups.map((wg, wgIdx) => {
+              const nc = noteCountPerWg[wgIdx];
+              const nsi = newNotes.length;
+              let estIdx = 0;
+              for (let k = 0; k < wgIdx; k++) estIdx += noteCountPerWg[k];
+              for (let j = 0; j < nc; j++) {
+                const e = estNotes[estIdx + j];
+                newNotes.push({
+                  id: `${seg.name}_n${newNotes.length}`,
+                  startTime: e.startTime,
+                  duration: e.duration,
+                  midiPitch: e.midiPitch,
+                  centsOffset: e.centsOffset,
+                  isRest: e.isRest,
+                });
+              }
+              return { ...wg, noteStartIndex: nsi, noteCount: nc };
+            });
+
+            projStore.updateSegmentData(i, { notes: newNotes, wordGroups: newWgs });
+          } catch (err) {
+            console.warn(`SOME estimation failed for ${seg.name}:`, err);
+          }
+        } else {
+          const { f0, f0Timestep, notes, wordGroups } = seg.data;
+          if (!f0 || f0.length === 0) { processed++; continue; }
+
+          const noteAsWg = notes.map((n) => ({
+            startPhIndex: 0, phCount: 0,
+            startTime: n.startTime, duration: n.duration,
+            noteStartIndex: 0, noteCount: 1,
+          }));
+          const estimated = estimateMidi(f0, f0Timestep, noteAsWg);
+          const updatedNotes = notes.map((note, ni) => {
+            if (ni >= estimated.length) return note;
+            const est = estimated[ni];
+            return est.isRest ? { ...note, isRest: true } : { ...note, midiPitch: est.midiPitch, centsOffset: est.centsOffset, isRest: false };
+          });
+          projStore.updateSegmentData(i, { notes: updatedNotes });
+        }
+
+        processed++;
+      }
+
+      useStatusStore.getState().setStatus(`批量估算完成（${total}/${total}）`, 'success');
+      setTimeout(() => useStatusStore.getState().setIdle(), 3000);
+    } catch (err) {
+      console.error('Batch estimation failed:', err);
+      useStatusStore.getState().setStatus('批量估算失败', 'error');
+      setTimeout(() => useStatusStore.getState().setIdle(), 3000);
+    }
+  }, []);
+
   const sidebarSegments = segments.map((seg) => ({
     name: seg.name,
     status: seg.status,
@@ -727,6 +845,20 @@ export default function App() {
 
       {showLicensesDialog && (
         <LicensesDialog onClose={() => setShowLicensesDialog(false)} />
+      )}
+
+      {showBatchRenameDialog && project && (
+        <BatchPhonemeRenameDialog
+          phSeq={(() => {
+            const all: string[] = [];
+            for (const seg of segments) {
+              for (const ph of seg.data.phSeq) all.push(ph);
+            }
+            return all;
+          })()}
+          onConfirm={handleBatchRename}
+          onCancel={() => setShowBatchRenameDialog(false)}
+        />
       )}
     </div>
   );

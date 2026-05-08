@@ -357,11 +357,17 @@ pub fn run() {
                 .build(app)?;
             let extract_all_f0 = MenuItemBuilder::with_id("menu-extract-all-f0", "提取所有 F0...")
                 .build(app)?;
+            let batch_estimate = MenuItemBuilder::with_id("menu-batch-estimate", "批量自动估算音符音高...")
+                .build(app)?;
+            let batch_rename_ph = MenuItemBuilder::with_id("menu-batch-rename-ph", "批量修改音素...")
+                .build(app)?;
 
             let tools_menu = SubmenuBuilder::new(app, "工具")
                 .item(&phnum)
                 .item(&rebuild_notes)
                 .item(&extract_all_f0)
+                .item(&batch_estimate)
+                .item(&batch_rename_ph)
                 .separator()
                 .item(&MenuItemBuilder::with_id("menu-settings", "设置...")
                     .accelerator("CmdOrCtrl+,")
