@@ -19,6 +19,7 @@ const LICENSES = [
     { name: 'React', license: 'MIT', url: 'https://github.com/facebook/react' },
     { name: 'Zustand', license: 'MIT', url: 'https://github.com/pmndrs/zustand' },
     { name: 'Vite', license: 'MIT', url: 'https://github.com/vitejs/vite' },
+    { name: 'TypeScript', license: 'Apache-2.0', url: 'https://github.com/microsoft/TypeScript' },
     { name: '@tauri-apps/api', license: 'MIT/Apache-2.0', url: 'https://github.com/tauri-apps/tauri' },
     { name: '@tauri-apps/plugin-dialog', license: 'MIT/Apache-2.0', url: 'https://github.com/tauri-apps/plugins-workspace' },
     { name: '@tauri-apps/plugin-fs', license: 'MIT/Apache-2.0', url: 'https://github.com/tauri-apps/plugins-workspace' },
